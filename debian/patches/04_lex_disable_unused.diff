@@ -1,0 +1,20 @@
+
+Defining __unused causes breakage in system headers (see #522773 and #522774).
+
+Note: special care should be taken with flex.skl; this code isn't compiled in
+lex itself, it is used as template to generate code that will later be built
+in other packages (e.g. kfreebsd-9).
+
+--- a/src/contrib/flex/flex.skl
++++ b/src/contrib/flex/flex.skl
+@@ -202,8 +202,10 @@
+ #include <sys/cdefs.h>
+ #include <stdint.h>
+ #else
++#ifndef __dead2
+ #define	__dead2
+ #endif
++#endif
+ 
+ /* begin standard C headers. */
+ %if-c-only

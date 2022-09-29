@@ -1,0 +1,15 @@
+---
+ src/share/mk/bsd.own.mk |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/src/share/mk/bsd.own.mk
++++ b/src/share/mk/bsd.own.mk
+@@ -210,7 +210,7 @@
+ STRIP?=		-s
+ .endif
+ 
+-COMPRESS_CMD?=	gzip -cn
++COMPRESS_CMD?=	gzip -cn -9
+ COMPRESS_EXT?=	.gz
+ 
+ # Set XZ_THREADS to 1 to disable multi-threading.

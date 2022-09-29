@@ -1,0 +1,50 @@
+--- a/src/usr.bin/make/Makefile
++++ b/src/usr.bin/make/Makefile
+@@ -6,6 +6,7 @@
+ 
+ PROG=	make
+ CFLAGS+=-I${.CURDIR}
++LDADD+=-lbsd
+ SRCS=	arch.c buf.c cond.c dir.c for.c hash.c hash_tables.c job.c	\
+ 	lst.c main.c make.c parse.c proc.c shell.c str.c suff.c targ.c	\
+ 	util.c var.c
+--- a/src/usr.sbin/mtree/Makefile
++++ b/src/usr.sbin/mtree/Makefile
+@@ -12,7 +12,7 @@
+ 
+ CFLAGS+= -DMD5 -DSHA1 -DRMD160 -DSHA256
+ DPADD=	${LIBMD}
+-LDADD=	-lmd
++LDADD=	-lmd -lbsd
+ 
+ .if ${MK_NMTREE} == "no"
+ LINKS=	${BINDIR}/fmtree ${BINDIR}/mtree
+--- a/src/usr.bin/brandelf/Makefile
++++ b/src/usr.bin/brandelf/Makefile
+@@ -1,5 +1,6 @@
+ # $FreeBSD$
+ 
+ PROG=	brandelf
++LDADD=	-lbsd
+ 
+ .include <bsd.prog.mk>
+--- a/src/usr.bin/cksum/Makefile
++++ b/src/usr.bin/cksum/Makefile
+@@ -3,6 +3,7 @@
+ 
+ PROG=	cksum
+ SRCS=	cksum.c crc.c print.c sum1.c sum2.c crc32.c
++LDADD+=	-lbsd
+ SIMLINKS=	${BINDIR}/cksum ${BINDIR}/sum
+ MLINKS=	cksum.1 sum.1
+ 
+--- a/src/usr.bin/file2c/Makefile
++++ b/src/usr.bin/file2c/Makefile
+@@ -3,6 +3,7 @@
+ .include <bsd.own.mk>
+ 
+ PROG=	file2c
++LDADD+=	-lbsd
+ 
+ .if ${MK_TESTS} != "no"
+ SUBDIR+= tests

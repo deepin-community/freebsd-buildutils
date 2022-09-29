@@ -1,0 +1,11 @@
+--- a/src/share/mk/sys.mk
++++ b/src/share/mk/sys.mk
+@@ -155,7 +155,7 @@
+ 
+ SHELL		?=	sh
+ 
+-YACC		?=	yacc
++YACC		?=	byacc
+ .if defined(%POSIX)
+ YFLAGS		?=
+ .else

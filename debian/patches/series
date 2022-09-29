@@ -1,0 +1,35 @@
+# Patches from (or merged in) upstream
+mk_eisa.diff
+r276494.diff
+
+# Patches that are in good shape for merging upstream
+yacc_is_byacc.diff
+kldxref_abort_on_error.diff
+
+# Other patches that might or might not be mergeable
+00_upstream.diff
+01_make_fixes.diff
+03_glibc.diff
+04_lex_disable_unused.diff
+05_disable_hardlinks.diff
+08_maxpathlen.diff
+15_manpages_gzip.diff
+16_bootstrap_pmake.diff
+#17_multiarch.diff
+18_fix_sysdir.diff
+21_endian.diff
+22_ld_as_needed.diff
+disable_wsystem_headers.diff
+nostrip.diff
+config_ldflags.diff
+prototype-setmode.diff
+
+# Patches that are likely to be Debian-specific
+avoid_defsyspath_collision.diff
+aicasm.diff
+makefiles.diff
+#test
+hppa.diff
+man_symlinks.diff
+ar_command_lines.diff
+armhf.diff

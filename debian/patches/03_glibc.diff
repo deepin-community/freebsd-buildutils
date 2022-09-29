@@ -1,0 +1,11 @@
+--- a/src/usr.sbin/mtree/specspec.c
++++ b/src/usr.sbin/mtree/specspec.c
+@@ -84,8 +84,6 @@
+ 		printf(" rmd160digest=%s", n->rmd160digest);
+ 	if (f & F_SHA256)
+ 		printf(" sha256digest=%s", n->sha256digest);
+-	if (f & F_FLAGS)
+-		printf(" flags=%s", flags_to_string(n->st_flags));
+ 	printf("\n");
+ }
+ 

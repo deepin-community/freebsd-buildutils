@@ -1,0 +1,26 @@
+--- a/src/usr.bin/cksum/Makefile
++++ b/src/usr.bin/cksum/Makefile
+@@ -3,7 +3,7 @@
+ 
+ PROG=	cksum
+ SRCS=	cksum.c crc.c print.c sum1.c sum2.c crc32.c
+-LINKS=	${BINDIR}/cksum ${BINDIR}/sum
++SIMLINKS=	${BINDIR}/cksum ${BINDIR}/sum
+ MLINKS=	cksum.1 sum.1
+ 
+ .include <bsd.prog.mk>
+--- a/src/usr.bin/lex/Makefile
++++ b/src/usr.bin/lex/Makefile
+@@ -10,9 +10,9 @@
+ #
+ 
+ PROG=		lex
+-LINKS+=	${BINDIR}/lex ${BINDIR}/lex++
+-LINKS+=	${BINDIR}/lex ${BINDIR}/flex
+-LINKS+=	${BINDIR}/lex ${BINDIR}/flex++
++SIMLINKS+=	${BINDIR}/lex ${BINDIR}/lex++
++SIMLINKS+=	${BINDIR}/lex ${BINDIR}/flex
++SIMLINKS+=	${BINDIR}/lex ${BINDIR}/flex++
+ 
+ FLEXDIR=	${.CURDIR}/../../contrib/flex
+ 

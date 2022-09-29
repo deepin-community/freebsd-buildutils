@@ -1,0 +1,60 @@
+---
+ src/usr.bin/make/arch.c          |    4 ++++
+ src/usr.bin/make/main.c          |    3 +++
+ src/usr.sbin/config/main.c       |    4 ++++
+ src/usr.sbin/config/mkmakefile.c |    4 ++++
+ src/usr.sbin/config/mkoptions.c  |    4 ++++
+ src/usr.sbin/mtree/create.c      |    4 ++++
+ src/usr.sbin/mtree/extern.h      |    5 +++--
+ 7 files changed, 26 insertions(+), 2 deletions(-)
+
+--- a/src/usr.bin/make/arch.c
++++ b/src/usr.bin/make/arch.c
+@@ -191,6 +191,10 @@
+ 		Error ARGS;					\
+     } while (0)
+ 
++#ifndef MAXPATHLEN
++#  define MAXPATHLEN 4096
++#endif
++
+ /*-
+  *-----------------------------------------------------------------------
+  * Arch_ParseArchive --
+--- a/src/usr.bin/make/main.c
++++ b/src/usr.bin/make/main.c
+@@ -255,6 +255,9 @@
+ {
+ 	char *fname, *fnamesave;	/* makefile to read */
+ 	FILE *stream;
++#ifndef MAXPATHLEN
++# define MAXPATHLEN 4096
++#endif
+ 	char *name, path[MAXPATHLEN];
+ 	char *MAKEFILE;
+ 	int setMAKEFILE;
+--- a/src/usr.sbin/mtree/create.c
++++ b/src/usr.sbin/mtree/create.c
+@@ -67,6 +67,10 @@
+ #define	INDENTNAMELEN	15
+ #define	MAXLINELEN	80
+ 
++#ifndef MAXHOSTNAMELEN
++#  define MAXHOSTNAMELEN 255
++#endif
++
+ static gid_t gid;
+ static uid_t uid;
+ static mode_t mode;
+--- a/src/usr.sbin/mtree/extern.h
++++ b/src/usr.sbin/mtree/extern.h
+@@ -54,6 +54,7 @@
+ extern u_int keys;
+ extern int lineno;
+ extern int dflag, eflag, iflag, nflag, qflag, rflag, sflag, uflag, wflag;
+-#ifdef MAXPATHLEN
+-extern char fullpath[MAXPATHLEN];
++#ifndef MAXPATHLEN
++#  define MAXPATHLEN 4096
+ #endif
++extern char fullpath[MAXPATHLEN];

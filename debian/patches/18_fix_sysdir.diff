@@ -1,0 +1,24 @@
+Index: freebsd-buildutils/src/share/mk/bsd.kmod.mk
+===================================================================
+--- freebsd-buildutils.orig/src/share/mk/bsd.kmod.mk
++++ freebsd-buildutils/src/share/mk/bsd.kmod.mk
+@@ -1,15 +1,17 @@
+ # $FreeBSD$
+ 
++KVER!=		uname -r
++
+ # Search for kernel source tree in standard places.
+ .for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. ${.CURDIR}/../../../.. \
+-    ${.CURDIR}/../../../../.. /sys /usr/src/sys
++    ${.CURDIR}/../../../../.. /usr/src/kfreebsd-headers-${KVER}/sys
+ .if !defined(SYSDIR) && exists(${_dir}/kern/) && exists(${_dir}/conf/kmod.mk)
+ SYSDIR=	${_dir}
+ .endif
+ .endfor
+ .if !defined(SYSDIR) || !exists(${SYSDIR}/kern/) || \
+     !exists(${SYSDIR}/conf/kmod.mk)
+-.error Unable to locate the kernel source tree. Set SYSDIR to override.
++.error "can't find kernel headers, install kfreebsd-headers-${KVER} package"
+ .endif
+ 
+ .include "${SYSDIR}/conf/kmod.mk"

@@ -1,0 +1,9 @@
+--- a/src/usr.bin/file2c/Makefile
++++ b/src/usr.bin/file2c/Makefile
+@@ -1,5 +1,6 @@
+ # $FreeBSD$
+ 
+ PROG=	file2c
++LDADD= -lbsd
+ WARNS?=	6
+ .include <bsd.prog.mk>

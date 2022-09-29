@@ -1,0 +1,261 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+full_version	:= $(shell dpkg-parsechangelog | grep ^Version: | sed -e 's/^.*: //g')
+tar_version	:= $(shell echo $(full_version) | sed -e 's/-.*//g')
+svn_revision	:= $(shell echo $(full_version) | sed -e 's/.*~svn\([0-9]*\)-[0-9]*/\1/g' -e 's/^$(full_version)$$/HEAD/g')
+version		:= $(shell echo $(full_version) | sed -e 's/[~+-].*//g')
+pversion	:= $(shell echo $(version) | sed -e 's/\./_/g')
+major           := $(shell echo $(version) | sed -e 's/\..*//g')
+revision	:= $(shell echo $(full_version) | sed -e 's/^[^+-]*//g')
+
+include /usr/share/dpkg/architecture.mk
+
+# Determine host architecture compiler
+ifeq ($(origin CC),default)
+CC := $(DEB_HOST_GNU_TYPE)-gcc
+endif
+
+# Use hardening flags
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# Pre-define CFLAGS, for hardening, debug and optimisation level
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+MACHINE_ARCH		:= $(DEB_HOST_ARCH_CPU)
+MACHINE_MULTIARCH	:= $(DEB_HOST_MULTIARCH)
+
+ifeq ($(DEB_HOST_ARCH_CPU), arm)
+ifneq (,$(findstring armhf,$(DEB_HOST_ARCH)))
+MACHINE_ARCH		:= armv6hf
+else
+MACHINE_ARCH		:= armv6
+endif
+endif
+
+ifneq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+    export STRIPFLAG=
+endif
+
+EXTRA_CFLAGS = \
+	-D_GNU_SOURCE -pipe -Wall \
+        -DMACHINE_ARCH='\"$(MACHINE_ARCH)\"' \
+        -DMACHINE_MULTIARCH='\"$(MACHINE_MULTIARCH)\"' \
+        -I$(CURDIR)/build-tree/src/sys \
+	-isystem /usr/include/freebsd \
+	-fPIC \
+	$(CPPFLAGS) \
+	$(NULL)
+# disabled due to #630907 (see also 20_libbsd_overlay.diff)
+# $(shell pkg-config --cflags libbsd-overlay)
+CFLAGS	+= $(EXTRA_CFLAGS)
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+
+	# Do not mess with MAKEFLAGS until we transfer control to BSD make (see below)
+	BSD_MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+SVN_BASE	:= https://svn.freebsd.org/base
+#SVN		:= $(SVN_BASE)/release/$(version).0
+SVN		:= $(SVN_BASE)/releng/$(version)
+#SVN		:= $(SVN_BASE)/stable/$(major)
+#SVN		:= $(SVN_BASE)/head
+
+SOURCE = freebsd-buildutils
+ORIGDIR = $(SOURCE)-$(tar_version)
+TARNAME = $(SOURCE)_$(tar_version).orig.tar.xz
+SOURCE_DATE_EPOCH ?= $(shell date -d "$$(dpkg-parsechangelog -SDate)" +%s)
+
+PMAKE_COMMON = \
+	MAKEFLAGS=$(BSD_MAKEFLAGS) \
+	NO_WERROR=1 NOGCCERROR=1 \
+	NOSHARED=NO NO_SHARED=NO NO_PROFILE=1 \
+	bmake \
+	CC=$(CC) \
+	-m $(CURDIR)/src/share/mk \
+	$(NULL)
+PMAKE = \
+	CFLAGS="$(CFLAGS)" \
+	$(PMAKE_COMMON)
+
+YACC = byacc
+
+package = $(SOURCE)
+
+get-orig-source:
+	rm -rf $(ORIGDIR)
+	mkdir -p $(ORIGDIR)/src/sys/sys $(ORIGDIR)/src/sys/kern/
+	for i in \
+		share/mk \
+		usr.bin/cksum \
+		usr.bin/elfdump \
+		usr.bin/file2c \
+		usr.bin/lex \
+		contrib/flex \
+		usr.bin/make \
+		usr.bin/mkdep \
+		usr.bin/brandelf \
+		usr.sbin/btxld \
+		usr.sbin/config \
+		usr.sbin/kgzip \
+		usr.sbin/kldxref \
+		usr.sbin/mtree \
+		sys/dev/aic7xxx/aicasm \
+	; do \
+		svn export --ignore-keywords -r $(svn_revision) $(SVN)/$$i $(ORIGDIR)/src/$$i || exit ; \
+	done
+	# Clamp timestamps to be no newer than last changelog entry, see
+	# https://wiki.debian.org/ReproducibleBuilds/TimestampsInTarball
+	find $(ORIGDIR) -newermt "@$(SOURCE_DATE_EPOCH)" -print0 \
+	 | xargs -0r touch --no-dereference --date="@$(SOURCE_DATE_EPOCH)"
+	# Create tarball with files sorted in a stable order, see
+	# https://wiki.debian.org/ReproducibleBuilds/FileOrderInTarballs
+	find $(ORIGDIR) -print0 | LC_ALL=C sort -z \
+	 | tar --null --no-recursion --files-from - \
+	    --numeric-owner --owner 0 --group 0 \
+	    -cJf ../$(TARNAME)
+	rm -rf $(ORIGDIR)
+
+unpack: unpack-stamp
+unpack-stamp:
+	mkdir build-tree
+	cp -a src build-tree/
+
+	touch unpack-stamp
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+
+build-stamp: unpack-stamp
+	dh_testdir
+
+	$(PMAKE) -C build-tree/src/usr.bin/make
+
+	$(PMAKE) -C build-tree/src/usr.bin/cksum
+
+	cd build-tree/src/usr.bin/lex ; \
+		$(PMAKE) bootstrap ; \
+		$(PMAKE) NO_INSTALLLIB=1
+
+	$(PMAKE) -C build-tree/src/usr.bin/mkdep
+	$(PMAKE) -C build-tree/src/usr.sbin/mtree
+	$(PMAKE) -C build-tree/src/usr.bin/file2c
+	$(PMAKE) -C build-tree/src/usr.bin/brandelf
+	$(PMAKE) -C build-tree/src/sys/dev/aic7xxx/aicasm
+ifeq ($(DEB_HOST_ARCH_OS), kfreebsd)
+	# Not portable yet. Maybe someday...
+	$(PMAKE) -C build-tree/src/usr.sbin/kldxref
+endif
+
+	PATH=$(CURDIR)/build-tree/src/usr.bin/file2c:$(PATH) \
+		$(PMAKE) -C build-tree/src/usr.sbin/config
+
+	touch build-stamp
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	$(PMAKE) -C build-tree/src/usr.bin/file2c install DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+	$(PMAKE) -C build-tree/src/usr.bin/brandelf install DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+
+	for i in cksum lex mkdep ; do \
+	  $(PMAKE) -C $(CURDIR)/build-tree/src/usr.bin/$$i install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/lib/freebsd ; \
+	done
+	for i in config ; do \
+	  $(PMAKE) -C $(CURDIR)/build-tree/src/usr.sbin/$$i install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/lib/freebsd ; \
+	done
+	$(PMAKE) -C build-tree/src/share/mk install \
+		DESTDIR=$(CURDIR)/debian/freebsd-mk BINDIR=/usr/share \
+		WITH_TESTS=yes
+
+	$(PMAKE) -C build-tree/src/sys/dev/aic7xxx/aicasm install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+
+ifeq ($(DEB_HOST_ARCH_OS), kfreebsd)
+	$(PMAKE) -C build-tree/src/usr.sbin/kldxref install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+endif
+
+	# Legacy make (aka fmake / fmtree)
+	$(PMAKE) -C $(CURDIR)/build-tree/src/usr.bin/make install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+	$(PMAKE) -C $(CURDIR)/build-tree/src/usr.sbin/mtree install \
+		DESTDIR=$(CURDIR)/debian/$(package) BINDIR=/usr/bin
+
+	# remove trash
+	rm -rf 	$(CURDIR)/debian/$(package)/usr/include \
+		$(CURDIR)/debian/$(package)/var
+	for i in `find $(CURDIR)/debian/$(package)/usr/share/man -type l` ; do \
+		rm $$i ; \
+	done
+	rm -f $(CURDIR)/debian/$(package)/usr/share/man/man5/mtree.5.gz
+
+	# relocate files
+	for i in `cd $(CURDIR)/debian/$(package)/usr/lib/freebsd && ls` ; do \
+		ln -s ../lib/freebsd/$$i \
+			$(CURDIR)/debian/$(package)/usr/bin/freebsd-$$i ; \
+		for m in $(CURDIR)/debian/$(package)/usr/share/man/man[0-9]/$$i.* ; do \
+			mv $$m `echo $$m | sed -e 's:\(man[0-9]/\):\1freebsd-:'` ; \
+		done ; \
+	done
+	rmdir $(CURDIR)/debian/$(package)/usr/sbin
+
+	dh_install
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -rf build-tree
+	rm -f *-stamp
+
+	dh_clean
+
+
+# Build architecture-independent files here.
+binary-indep: build binary-arch install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+#	dh_installdebconf
+	dh_installdocs
+#	dh_installexamples
+#	dh_installmenu
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+#	dh_installinit
+#	dh_installcron
+	dh_installman
+#	dh_installinfo
+	dh_installchangelogs
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+#	dh_makeshlibs
+	dh_installdeb
+#	dh_perl
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

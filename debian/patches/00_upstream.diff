@@ -1,0 +1,206 @@
+--- a/src/usr.sbin/mtree/compare.c
++++ b/src/usr.sbin/mtree/compare.c
+@@ -176,21 +176,22 @@
+ 		    (intmax_t)s->st_size, (intmax_t)p->fts_statp->st_size);
+ 		tab = "\t";
+ 	}
++#ifdef ST_MTIM
+ 	/*
+ 	 * XXX
+ 	 * Catches nano-second differences, but doesn't display them.
+ 	 */
+ 	if ((s->flags & F_TIME) &&
+-	     ((s->st_mtimespec.tv_sec != p->fts_statp->st_mtim.tv_sec) ||
+-	     (s->st_mtimespec.tv_nsec != p->fts_statp->st_mtim.tv_nsec))) {
++	     ((s->ST_MTIM.tv_sec != p->fts_statp->st_mtim.tv_sec) ||
++	     (s->ST_MTIM.tv_nsec != p->fts_statp->st_mtim.tv_nsec))) {
+ 		LABEL;
+ 		(void)printf("%smodification time expected %.24s ",
+-		    tab, ctime(&s->st_mtimespec.tv_sec));
++		    tab, ctime(&s->ST_MTIM.tv_sec));
+ 		(void)printf("found %.24s",
+ 		    ctime(&p->fts_statp->st_mtim.tv_sec));
+ 		if (uflag) {
+-			tv[0].tv_sec = s->st_mtimespec.tv_sec;
+-			tv[0].tv_usec = s->st_mtimespec.tv_nsec / 1000;
++			tv[0].tv_sec = s->ST_MTIM.tv_sec;
++			tv[0].tv_usec = s->ST_MTIM.tv_nsec / 1000;
+ 			tv[1] = tv[0];
+ 			if (utimes(p->fts_accpath, tv))
+ 				(void)printf(" not modified: %s\n",
+@@ -201,6 +202,7 @@
+ 			(void)printf("\n");
+ 		tab = "\t";
+ 	}
++#endif		/* ST_MTIM */
+ 	if (s->flags & F_CKSUM) {
+ 		if ((fd = open(p->fts_accpath, O_RDONLY, 0)) < 0) {
+ 			LABEL;
+@@ -223,6 +225,7 @@
+ 			}
+ 		}
+ 	}
++#if defined(__FreeBSD__)
+ 	if ((s->flags & F_FLAGS) && s->st_flags != p->fts_statp->st_flags) {
+ 		LABEL;
+ 		fflags = flags_to_string(s->st_flags);
+@@ -243,6 +246,7 @@
+ 			(void)printf("\n");
+ 		tab = "\t";
+ 	}
++#endif
+ #ifdef MD5
+ 	if (s->flags & F_MD5) {
+ 		char *new_digest, buf[33];
+--- a/src/usr.sbin/mtree/create.c
++++ b/src/usr.sbin/mtree/create.c
+@@ -265,11 +265,13 @@
+ 	if (keys & F_SLINK &&
+ 	    (p->fts_info == FTS_SL || p->fts_info == FTS_SLNONE))
+ 		output(indent, &offset, "link=%s", rlink(p->fts_accpath));
++#if defined(__FreeBSD__)
+ 	if (keys & F_FLAGS && p->fts_statp->st_flags != flags) {
+ 		fflags = flags_to_string(p->fts_statp->st_flags);
+ 		output(indent, &offset, "flags=%s", fflags);
+ 		free(fflags);
+ 	}
++#endif
+ 	(void)putchar('\n');
+ }
+ 
+@@ -328,6 +330,7 @@
+ 				maxuid = u[suid];
+ 			}
+ 
++#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+ 			/*
+ 			 * XXX
+ 			 * note that the below will break when file flags
+@@ -341,6 +344,7 @@
+ 				saveflags = sflags;
+ 				maxflags = f[FLAGS2IDX(sflags)];
+ 			}
++#endif			/* __FreeBSD__ */
+ 		}
+ 	}
+ 	/*
+@@ -384,11 +388,13 @@
+ 			(void)printf(" mode=%#o", savemode);
+ 		if (keys & F_NLINK)
+ 			(void)printf(" nlink=1");
++#if defined(__FreeBSD__)
+ 		if (keys & F_FLAGS) {
+ 			fflags = flags_to_string(saveflags);
+ 			(void)printf(" flags=%s", fflags);
+ 			free(fflags);
+ 		}
++#endif
+ 		(void)printf("\n");
+ 		*puid = saveuid;
+ 		*pgid = savegid;
+--- a/src/usr.sbin/mtree/misc.c
++++ b/src/usr.sbin/mtree/misc.c
+@@ -107,6 +107,7 @@
+ 	return (strcmp(((const KEY *)a)->name, ((const KEY *)b)->name));
+ }
+ 
++#if defined(__FreeBSD__)
+ char *
+ flags_to_string(u_long fflags)
+ {
+@@ -122,3 +123,4 @@
+ 
+ 	return string;
+ }
++#endif /* __FreeBSD__ */
+--- a/src/usr.sbin/mtree/mtree.h
++++ b/src/usr.sbin/mtree/mtree.h
+@@ -42,7 +42,16 @@
+ 	struct _node	*parent, *child;	/* up, down */
+ 	struct _node	*prev, *next;		/* left, right */
+ 	off_t	st_size;			/* size */
+-	struct timespec	st_mtimespec;		/* last modification time */
++#ifdef __GLIBC__
++# ifdef _STATBUF_ST_NSEC
++#  define ST_MTIM st_mtim
++# endif
++#else
++# define ST_MTIM st_mtimespec
++#endif
++#ifdef ST_MTIM
++	struct timespec	ST_MTIM;		/* last modification time */
++#endif
+ 	u_long	cksum;				/* check sum */
+ 	char	*md5digest;			/* MD5 digest */
+ 	char	*sha1digest;			/* SHA-1 digest */
+--- a/src/usr.sbin/mtree/spec.c
++++ b/src/usr.sbin/mtree/spec.c
+@@ -204,12 +204,14 @@
+ 			if(!ip->rmd160digest)
+ 				errx(1, "strdup");
+ 			break;
++#if defined(__FreeBSD__)
+ 		case F_FLAGS:
+ 			if (strcmp("none", val) == 0)
+ 				ip->st_flags = 0;
+ 			else if (strtofflags(&val, &ip->st_flags, NULL) != 0)
+ 				errx(1, "line %d: invalid flag %s",lineno, val);
+  			break;
++#endif
+ 		case F_GID:
+ 			ip->st_gid = strtoul(val, &ep, 10);
+ 			if (*ep)
+@@ -252,20 +254,22 @@
+ 			if (strunvis(ip->slink, val) == -1)
+ 				errx(1, "symlink %s is ill-encoded", val);
+ 			break;
++#ifdef ST_MTIM
+ 		case F_TIME:
+-			ip->st_mtimespec.tv_sec = strtoul(val, &ep, 10);
++			ip->ST_MTIM.tv_sec = strtoul(val, &ep, 10);
+ 			if (*ep == '.') {
+ 				/* Note: we require exactly nine
+ 				 * digits after the decimal point. */
+ 				val = ep + 1;
+-				ip->st_mtimespec.tv_nsec
++				ip->ST_MTIM.tv_nsec
+ 				    = strtoul(val, &ep, 10);
+ 			} else
+-				ip->st_mtimespec.tv_nsec = 0;
++				ip->ST_MTIM.tv_nsec = 0;
+ 			if (*ep)
+ 				errx(1, "line %d: invalid time %s",
+ 				    lineno, val);
+ 			break;
++#endif
+ 		case F_TYPE:
+ 			switch(*val) {
+ 			case 'b':
+--- a/src/usr.sbin/mtree/specspec.c
++++ b/src/usr.sbin/mtree/specspec.c
+@@ -150,8 +150,10 @@
+ 		differs |= F_SIZE;
+ 	if (FS(n1, n2, F_SLINK, slink))
+ 		differs |= F_SLINK;
+-	if (FM(n1, n2, F_TIME, st_mtimespec))
++#ifdef ST_MTIM
++	if (FM(n1, n2, F_TIME, ST_MTIM))
+ 		differs |= F_TIME;
++#endif
+ 	if (FF(n1, n2, F_UID, st_uid))
+ 		differs |= F_UID;
+ 	if (FF(n1, n2, F_UNAME, st_uid))
+--- a/src/usr.sbin/mtree/verify.c
++++ b/src/usr.sbin/mtree/verify.c
+@@ -251,9 +251,11 @@
+ 		if (chmod(path, p->st_mode))
+ 			(void)printf("%s: permissions not set: %s\n",
+ 			    path, strerror(errno));
++#if defined(__FreeBSD__)
+ 		if ((p->flags & F_FLAGS) && p->st_flags &&
+ 		    chflags(path, p->st_flags))
+ 			(void)printf("%s: file flags not set: %s\n",
+ 			    path, strerror(errno));
++#endif
+ 	}
+ }
